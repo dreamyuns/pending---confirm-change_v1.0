@@ -1,0 +1,44 @@
+{
+  "login": {
+    "url": "https://adm.allmytour.com",
+    "user_id": "your_username",
+    "password": "your_password"
+  },
+  "file_paths": {
+    "excel_file": "uploads/order_confirmnum_list.xlsx",
+    "log_directory": "logs",
+    "result_directory": "results"
+  },
+  "urls": {
+    "base_url": "https://adm.allmytour.com",
+    "orders_page": "/orders",
+    "upload_page": "/orders/uploadConfirmNumExcel"
+  },
+  "search_settings": {
+    "search_status": "pending",
+    "startDate": "2025-09-01",
+    "endDate": "2025-09-30",
+    "dateType": "orderDate",
+    "orderChannelIdx": "",
+    "saleType": "",
+    "appoint_day_type": "",
+    "per_page": 20
+  },
+  "excel_settings": {
+    "test_mode": {
+      "enabled": false,
+      "start_row": 4,
+      "end_row": 7
+    }
+  },
+  "status_change": {
+    "change_to_status": "confirm"
+  },
+  "timing": {
+    "page_load_wait": 2,
+    "detail_page_wait": 2,
+    "refresh_wait": 2,
+    "lms_popup_wait": 2
+  }
+}
+

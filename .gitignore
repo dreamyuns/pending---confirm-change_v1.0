@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# FastAPI
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 환경 변수
+.env
+.env.local
+
+# 설정 파일 (민감한 정보 포함 가능)
+admin_confirm_config.json
+*.json.bak
+
+# 업로드된 파일
+uploads/*
+!uploads/.gitkeep
+
+# 로그 및 결과 파일
+logs/*
+!logs/.gitkeep
+results/*
+!results/.gitkeep
+
+# 임시 설정 파일
+temp_configs/*
+!temp_configs/.gitkeep
+
+# Lock 파일
+*.lock
+
+# Excel 파일 (예제 제외)
+*.xlsx
+*.xls
+!data/master_data.xlsx
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 백업 파일
+backup/
+
