@@ -617,20 +617,23 @@ def change_reservation_status(order_number):
             if current_value == target_value:
                 log_debug(f"상태 변경 성공: {previous_text}({previous_value}) → {current_text}({current_value})", order_number)
                 status_changed = True
-                
-                # 상태 변경 후 LMS 전송 (상세페이지가 열린 상태에서)
-                lms_success = send_lms(order_number)
-                lms_result = "성공" if lms_success else "실패"
-                log_debug(f"LMS 전송 결과: {lms_result}", order_number)
             else:
                 log_debug(f"상태 변경 실패: 현재 {current_text}({current_value}), 목표 {target_text}({target_value})", order_number)
                 status_changed = False
-                lms_result = "미처리"
             
-            # 창 닫기 및 메인창으로 복귀
+            # 창 닫기 및 메인창으로 복귀 (LMS 전송은 예약목록에서 수행)
             driver.close()
             driver.switch_to.window(main_window)
             time.sleep(get_timing_adv('refresh_wait', 2))
+            
+            # 상태 변경이 성공한 경우에만 예약목록에서 LMS 전송
+            if status_changed:
+                log_debug(f"예약목록으로 복귀 완료, LMS 전송 준비", order_number)
+                lms_success = send_lms_from_order_list(order_number)
+                lms_result = "성공" if lms_success else "실패"
+                log_debug(f"LMS 전송 결과: {lms_result}", order_number)
+            else:
+                lms_result = "미처리"
             
             # LMS 결과를 함께 반환하기 위해 튜플로 변경
             return (status_changed, current_value, lms_result)
@@ -653,14 +656,62 @@ def change_reservation_status(order_number):
             pass
         return (False, f"오류: {str(e)}", "미처리")
 
-# ✅ 8. [2단계: LMS 전송]
-def send_lms(order_number=None):
-    """LMS 전송 버튼을 클릭하고 팝업을 처리합니다."""
+# ✅ 8. [2단계: LMS 전송 - 예약목록에서]
+def send_lms_from_order_list(order_number=None):
+    """예약목록 페이지에서 해당 주문번호의 LMS 전송 버튼을 클릭하고 팝업을 처리합니다."""
     try:
-        log_debug(f"LMS 전송 시작", order_number)
+        log_debug(f"예약목록에서 LMS 전송 시작", order_number)
+        
+        # 페이지 새로고침 후 안정화 대기 (상세페이지에서 변경사항 반영)
+        time.sleep(get_timing_adv('refresh_wait', 2))
+        
+        # 방법1: 주문번호와 같은 행(td)에서 LMS 전송 버튼 찾기
+        try:
+            # 주문번호 링크를 찾고, 그 행(tr)을 찾은 다음 그 행에서 LMS 전송 버튼 찾기
+            order_link = driver.find_element(By.CSS_SELECTOR, f"a.blue_link[href='/orders/{order_number}']")
+            order_row = order_link.find_element(By.XPATH, "./ancestor::tr")
+            lms_button = order_row.find_element(By.CSS_SELECTOR, "input.send_lms.square_btn[value='LMS 전송']")
+            log_debug(f"방법1 - 주문번호 행에서 LMS 버튼 찾기 성공", order_number)
+        except Exception as e1:
+            log_debug(f"방법1 실패: {e1}", order_number)
+            try:
+                # 방법2: XPath로 주문번호 근처에서 LMS 버튼 찾기
+                lms_button = driver.find_element(By.XPATH, f"//a[@href='/orders/{order_number}']/ancestor::tr//input[@class='send_lms square_btn' and @value='LMS 전송']")
+                log_debug(f"방법2 - XPath로 LMS 버튼 찾기 성공", order_number)
+            except Exception as e2:
+                log_debug(f"방법2 실패: {e2}", order_number)
+                try:
+                    # 방법3: 모든 LMS 버튼을 찾고, 주문번호와 가까운 것을 선택
+                    # 주문번호 링크의 위치를 기준으로 가까운 LMS 버튼 찾기
+                    order_link = driver.find_element(By.CSS_SELECTOR, f"a.blue_link[href='/orders/{order_number}']")
+                    order_link_location = order_link.location
+                    all_lms_buttons = driver.find_elements(By.CSS_SELECTOR, "input.send_lms.square_btn[value='LMS 전송']")
+                    
+                    if len(all_lms_buttons) == 0:
+                        raise Exception("LMS 전송 버튼을 찾을 수 없습니다")
+                    
+                    # 가장 가까운 버튼 찾기 (간단하게 첫 번째 버튼 사용하거나, Y 좌표가 가장 가까운 것)
+                    lms_button = None
+                    min_distance = float('inf')
+                    for btn in all_lms_buttons:
+                        btn_location = btn.location
+                        # 같은 행에 있는지 확인 (Y 좌표가 비슷한지)
+                        if abs(btn_location['y'] - order_link_location['y']) < 50:  # 같은 행으로 간주
+                            distance = abs(btn_location['x'] - order_link_location['x'])
+                            if distance < min_distance:
+                                min_distance = distance
+                                lms_button = btn
+                    
+                    if lms_button is None:
+                        # 같은 행에서 찾지 못하면 가장 가까운 버튼 사용
+                        lms_button = all_lms_buttons[0]
+                    
+                    log_debug(f"방법3 - 위치 기반으로 LMS 버튼 찾기 성공", order_number)
+                except Exception as e3:
+                    log_debug(f"방법3 실패: {e3}", order_number)
+                    raise Exception(f"모든 방법으로 LMS 전송 버튼을 찾지 못했습니다: {e3}")
         
         # LMS 전송 버튼 클릭
-        lms_button = driver.find_element(By.CSS_SELECTOR, "input.send_lms.square_btn[value='LMS 전송']")
         lms_button.click()
         time.sleep(get_timing_adv('lms_popup_wait', 2))
         log_debug(f"LMS 전송 버튼 클릭 완료", order_number)
