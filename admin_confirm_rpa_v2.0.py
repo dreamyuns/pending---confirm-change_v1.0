@@ -665,56 +665,60 @@ def send_lms_from_order_list(order_number=None):
         # 페이지 새로고침 후 안정화 대기 (상세페이지에서 변경사항 반영)
         time.sleep(get_timing_adv('refresh_wait', 2))
         
-        # 방법1: 주문번호와 같은 행(td)에서 LMS 전송 버튼 찾기
+        # LMS 버튼과 타입 초기화
+        lms_button = None
+        button_type = None
+        
+        # 최적화된 방법: 주문번호와 같은 행에서 LMS 버튼 찾기
+        # (같은 행에 재전송/전송 버튼이 동시에 존재하지 않으므로, 한 번에 찾기 시도)
         try:
-            # 주문번호 링크를 찾고, 그 행(tr)을 찾은 다음 그 행에서 LMS 전송 버튼 찾기
+            # 주문번호 링크를 찾고, 그 행(tr)을 찾은 다음 그 행에서 LMS 버튼 찾기
             order_link = driver.find_element(By.CSS_SELECTOR, f"a.blue_link[href='/orders/{order_number}']")
             order_row = order_link.find_element(By.XPATH, "./ancestor::tr")
-            lms_button = order_row.find_element(By.CSS_SELECTOR, "input.send_lms.square_btn[value='LMS 전송']")
-            log_debug(f"방법1 - 주문번호 행에서 LMS 버튼 찾기 성공", order_number)
-        except Exception as e1:
-            log_debug(f"방법1 실패: {e1}", order_number)
+            
+            # 재전송 버튼과 전송 버튼을 동시에 찾기 시도 (CSS 선택자로 한 번에)
+            # 같은 행에 둘 다 존재하지 않으므로, 둘 중 하나만 존재
             try:
-                # 방법2: XPath로 주문번호 근처에서 LMS 버튼 찾기
-                lms_button = driver.find_element(By.XPATH, f"//a[@href='/orders/{order_number}']/ancestor::tr//input[@class='send_lms square_btn' and @value='LMS 전송']")
-                log_debug(f"방법2 - XPath로 LMS 버튼 찾기 성공", order_number)
-            except Exception as e2:
-                log_debug(f"방법2 실패: {e2}", order_number)
+                # 재전송 버튼 먼저 찾기 (우선순위)
+                lms_button = order_row.find_element(By.CSS_SELECTOR, "a.send_lms")
+                button_type = "재전송"
+                log_debug(f"같은 행에서 LMS 재전송 버튼 찾기 성공", order_number)
+            except:
+                # 재전송 버튼이 없으면 전송 버튼 찾기
+                lms_button = order_row.find_element(By.CSS_SELECTOR, "input.send_lms.square_btn[value='LMS 전송']")
+                button_type = "전송"
+                log_debug(f"같은 행에서 LMS 전송 버튼 찾기 성공", order_number)
+                    
+        except Exception as e1:
+            log_debug(f"같은 행에서 찾기 실패: {e1}, 대체 방법 시도", order_number)
+            try:
+                # 대체 방법: XPath로 주문번호 근처에서 LMS 버튼 찾기
+                # 재전송 버튼 먼저 찾기
                 try:
-                    # 방법3: 모든 LMS 버튼을 찾고, 주문번호와 가까운 것을 선택
-                    # 주문번호 링크의 위치를 기준으로 가까운 LMS 버튼 찾기
-                    order_link = driver.find_element(By.CSS_SELECTOR, f"a.blue_link[href='/orders/{order_number}']")
-                    order_link_location = order_link.location
-                    all_lms_buttons = driver.find_elements(By.CSS_SELECTOR, "input.send_lms.square_btn[value='LMS 전송']")
-                    
-                    if len(all_lms_buttons) == 0:
-                        raise Exception("LMS 전송 버튼을 찾을 수 없습니다")
-                    
-                    # 가장 가까운 버튼 찾기 (간단하게 첫 번째 버튼 사용하거나, Y 좌표가 가장 가까운 것)
-                    lms_button = None
-                    min_distance = float('inf')
-                    for btn in all_lms_buttons:
-                        btn_location = btn.location
-                        # 같은 행에 있는지 확인 (Y 좌표가 비슷한지)
-                        if abs(btn_location['y'] - order_link_location['y']) < 50:  # 같은 행으로 간주
-                            distance = abs(btn_location['x'] - order_link_location['x'])
-                            if distance < min_distance:
-                                min_distance = distance
-                                lms_button = btn
-                    
-                    if lms_button is None:
-                        # 같은 행에서 찾지 못하면 가장 가까운 버튼 사용
-                        lms_button = all_lms_buttons[0]
-                    
-                    log_debug(f"방법3 - 위치 기반으로 LMS 버튼 찾기 성공", order_number)
-                except Exception as e3:
-                    log_debug(f"방법3 실패: {e3}", order_number)
-                    raise Exception(f"모든 방법으로 LMS 전송 버튼을 찾지 못했습니다: {e3}")
+                    lms_button = driver.find_element(By.XPATH, f"//a[@href='/orders/{order_number}']/ancestor::tr//a[@class='send_lms']")
+                    button_type = "재전송"
+                    log_debug(f"XPath로 LMS 재전송 버튼 찾기 성공", order_number)
+                except:
+                    # 전송 버튼 찾기
+                    lms_button = driver.find_element(By.XPATH, f"//a[@href='/orders/{order_number}']/ancestor::tr//input[@class='send_lms square_btn' and @value='LMS 전송']")
+                    button_type = "전송"
+                    log_debug(f"XPath로 LMS 전송 버튼 찾기 성공", order_number)
+                        
+            except Exception as e2:
+                log_debug(f"XPath 방법도 실패: {e2}", order_number)
+                raise Exception(f"LMS 전송/재전송 버튼을 찾을 수 없습니다: {e2}")
         
-        # LMS 전송 버튼 클릭
+        # 버튼 타입 확인 (없으면 기본값 설정)
+        if button_type is None:
+            if lms_button.tag_name == 'a':
+                button_type = "재전송"
+            else:
+                button_type = "전송"
+        
+        # LMS 전송/재전송 버튼 클릭
         lms_button.click()
         time.sleep(get_timing_adv('lms_popup_wait', 2))
-        log_debug(f"LMS 전송 버튼 클릭 완료", order_number)
+        log_debug(f"LMS {button_type} 버튼 클릭 완료", order_number)
         
         # 팝업 처리 - 알럿 2개 처리
         try:
